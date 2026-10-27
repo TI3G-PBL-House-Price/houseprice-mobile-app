@@ -1,23 +1,25 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/app_sizes.dart';
-import '../../../core/constants/app_typography.dart';
-import '../../../core/widgets/custom_text_field.dart';
-import '../../../core/widgets/gradient_button.dart';
-import '../../../core/widgets/section_card.dart';
+import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_sizes.dart';
+import '../../../../core/constants/app_typography.dart';
+import '../../../../core/widgets/custom_text_field.dart';
+import '../../../../core/widgets/gradient_button.dart';
+import '../../../../core/widgets/section_card.dart';
+import '../../../history/presentation/widgets/history_bottom_sheet.dart';
+import 'result_page.dart';
 
 /// Layar Form Prediksi ML (FR-MOB-02).
 /// Form input parameter properti untuk estimasi harga.
 /// Referensi: design-system.md § 3A – Struktur Kartu Form Input Properti
-class PredictFormScreen extends StatefulWidget {
-  const PredictFormScreen({super.key});
+class PredictFormPage extends StatefulWidget {
+  const PredictFormPage({super.key});
 
   @override
-  State<PredictFormScreen> createState() => _PredictFormScreenState();
+  State<PredictFormPage> createState() => _PredictFormPageState();
 }
 
-class _PredictFormScreenState extends State<PredictFormScreen> {
+class _PredictFormPageState extends State<PredictFormPage> {
   // ── Mock Data Dropdown ─────────────────────────────────────────────────────
   static const _kotaOptions = [
     'Jakarta Selatan',
@@ -162,10 +164,18 @@ class _PredictFormScreenState extends State<PredictFormScreen> {
               text: 'Prediksi Harga',
               icon: Icons.auto_awesome_rounded,
               onPressed: () {
+                final location = (_selectedKota != null && _selectedKecamatan != null)
+                    ? '$_selectedKota - $_selectedKecamatan'
+                    : (_selectedKota ?? 'Jakarta Selatan - Kebayoran Baru');
+                HistoryBottomSheet.addRecord(
+                  type: 'prediksi',
+                  location: location,
+                  result: 2650000000,
+                );
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => const _ResultPlaceholder(),
+                    builder: (_) => const ResultPage(),
                   ),
                 );
               },
@@ -237,15 +247,5 @@ class _PredictFormScreenState extends State<PredictFormScreen> {
   }
 }
 
-/// Placeholder navigasi ke result screen (sementara).
-class _ResultPlaceholder extends StatelessWidget {
-  const _ResultPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Hasil Prediksi')),
-      body: const Center(child: Text('Halaman Hasil Prediksi')),
-    );
-  }
-}
+/// Alias PredictFormScreen agar kompatibel dengan penamaan lama.
+typedef PredictFormScreen = PredictFormPage;

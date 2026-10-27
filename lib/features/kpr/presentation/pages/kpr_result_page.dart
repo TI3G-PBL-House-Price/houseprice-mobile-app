@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/app_sizes.dart';
-import '../../../core/constants/app_typography.dart';
-import '../../../core/widgets/gradient_button.dart';
-import '../../../core/widgets/status_badge.dart';
+import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_sizes.dart';
+import '../../../../core/constants/app_typography.dart';
+import '../../../../core/widgets/gradient_button.dart';
+import '../../../../core/widgets/status_badge.dart';
+import '../../../history/presentation/widgets/history_bottom_sheet.dart';
 
 /// Layar Hasil Simulasi KPR (FR-MOB-05 Result).
 /// Referensi: design-system.md § 4B – Layar Hasil KPR
-class KprResultScreen extends StatelessWidget {
-  const KprResultScreen({super.key});
+class KprResultPage extends StatelessWidget {
+  const KprResultPage({super.key});
 
   // ── Mock Data ──────────────────────────────────────────────────────────────
   static final _currencyFormat = NumberFormat('#,###', 'id_ID');
@@ -33,6 +34,16 @@ class KprResultScreen extends StatelessWidget {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text('Hasil Simulasi KPR', style: AppTypography.sectionHeader),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history_rounded, color: AppColors.textSecondary),
+            tooltip: 'Riwayat',
+            onPressed: () {
+              HistoryBottomSheet.show(context);
+            },
+          ),
+          const SizedBox(width: AppSizes.xs),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(AppSizes.base),
@@ -50,13 +61,11 @@ class KprResultScreen extends StatelessWidget {
             _buildDsrCard(),
             const SizedBox(height: AppSizes.lg),
 
-            // ── Simpan ke Riwayat ─────────────────────────────────────────
+            // ── Hitung Ulang ──────────────────────────────────────────────
             GradientButton(
-              text: 'Simpan Hasil Simulasi ke Riwayat',
-              icon: Icons.bookmark_rounded,
-              onPressed: () {
-                // TODO: Simpan ke SQLite lokal
-              },
+              text: 'Hitung Ulang',
+              icon: Icons.refresh_rounded,
+              onPressed: () => Navigator.pop(context),
             ),
             const SizedBox(height: AppSizes.xxl),
           ],
@@ -151,9 +160,9 @@ class KprResultScreen extends StatelessWidget {
           // Legend
           Row(
             children: [
-              _buildLegendDot(AppColors.primaryBlue, 'Pokok (${_mockPrincipalPercent}%)'),
+              _buildLegendDot(AppColors.primaryBlue, 'Pokok ($_mockPrincipalPercent%)'),
               const SizedBox(width: AppSizes.base),
-              _buildLegendDot(AppColors.primaryBlue.withValues(alpha: 0.35), 'Bunga (${_mockInterestPercent}%)'),
+              _buildLegendDot(AppColors.primaryBlue.withValues(alpha: 0.35), 'Bunga ($_mockInterestPercent%)'),
             ],
           ),
           const SizedBox(height: AppSizes.lg),
@@ -265,3 +274,6 @@ class KprResultScreen extends StatelessWidget {
     );
   }
 }
+
+/// Alias KprResultScreen agar kompatibel dengan penamaan lama.
+typedef KprResultScreen = KprResultPage;

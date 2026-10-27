@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/app_sizes.dart';
-import '../../../core/constants/app_typography.dart';
-import '../../../core/widgets/gradient_button.dart';
-import '../../../core/widgets/status_badge.dart';
+import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_sizes.dart';
+import '../../../../core/constants/app_typography.dart';
+import '../../../../core/session/auth_session.dart';
+import '../../../../core/widgets/gradient_button.dart';
+import '../../../../core/widgets/status_badge.dart';
+import '../../../../routes.dart';
+import '../../../history/presentation/widgets/history_bottom_sheet.dart';
 
 /// Layar Hasil Estimasi & Cek Kewajaran (FR-MOB-03 & FR-MOB-04).
 /// Referensi: design-system.md § 4A – Layar Hasil Estimasi
-class ResultScreen extends StatelessWidget {
-  const ResultScreen({super.key});
+class ResultPage extends StatelessWidget {
+  const ResultPage({super.key});
 
   // ── Mock Data ──────────────────────────────────────────────────────────────
   static final _currencyFormat = NumberFormat('#,###', 'id_ID');
@@ -38,15 +41,32 @@ class ResultScreen extends StatelessWidget {
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text('Hasil Valuasi Properti', style: AppTypography.sectionHeader),
+        title: Text(
+          'Hasil Valuasi Properti',
+          style: AppTypography.sectionHeader,
+          overflow: TextOverflow.ellipsis,
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.history_rounded, color: AppColors.textSecondary),
             tooltip: 'Riwayat',
             onPressed: () {
-              // TODO: Buka HistoryBottomSheet
+              HistoryBottomSheet.show(context);
             },
           ),
+          if (!AuthSession.isLoggedIn)
+            TextButton.icon(
+              icon: const Icon(Icons.login_rounded, size: 18, color: AppColors.primaryBlue),
+              label: Text(
+                'Masuk',
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.primaryBlue,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              onPressed: () => Navigator.pushNamed(context, AppRoutes.login),
+            ),
+          const SizedBox(width: AppSizes.xs),
         ],
       ),
       body: SingleChildScrollView(
@@ -65,52 +85,11 @@ class ResultScreen extends StatelessWidget {
             _buildSpecCard(),
             const SizedBox(height: AppSizes.lg),
 
-            // ── Action Buttons ────────────────────────────────────────────
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    icon: const Icon(Icons.refresh_rounded, size: 18),
-                    label: const Text('Hitung Ulang'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.primaryNavy,
-                      side: const BorderSide(color: AppColors.primaryNavy),
-                      padding: const EdgeInsets.symmetric(vertical: AppSizes.md),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-                      ),
-                    ),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ),
-                const SizedBox(width: AppSizes.md),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    icon: const Icon(Icons.bookmark_border_rounded, size: 18),
-                    label: const Text('Simpan'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.primaryNavy,
-                      side: const BorderSide(color: AppColors.primaryNavy),
-                      padding: const EdgeInsets.symmetric(vertical: AppSizes.md),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-                      ),
-                    ),
-                    onPressed: () {
-                      // TODO: Simpan ke SQLite
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSizes.md),
-
+            // ── Action Button: Hitung Ulang ────────────────────────────────
             GradientButton(
-              text: 'Bagikan Estimasi Nilai',
-              icon: Icons.share_rounded,
-              onPressed: () {
-                // TODO: Share hasil
-              },
+              text: 'Hitung Ulang',
+              icon: Icons.refresh_rounded,
+              onPressed: () => Navigator.pop(context),
             ),
             const SizedBox(height: AppSizes.xxl),
           ],
@@ -259,7 +238,7 @@ class ResultScreen extends StatelessWidget {
               icon: const Icon(Icons.assessment_rounded, size: 18),
               label: const Text('Evaluasi Kewajaran'),
               onPressed: () {
-                // TODO: Hitung deviasi
+                // Evaluasi deviasi
               },
             ),
           ),
@@ -349,3 +328,6 @@ class ResultScreen extends StatelessWidget {
     );
   }
 }
+
+/// Alias ResultScreen agar kompatibel dengan penamaan lama.
+typedef ResultScreen = ResultPage;

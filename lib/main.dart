@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 import 'core/theme/app_theme.dart';
-import 'presentation/screens/main_navigation.dart';
+import 'routes.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('id_ID', null);
   runApp(const HousePriceApp());
 }
 
 class HousePriceApp extends StatelessWidget {
-  const HousePriceApp({super.key});
+  final String? initialRoute;
+
+  const HousePriceApp({super.key, this.initialRoute});
 
   @override
   Widget build(BuildContext context) {
@@ -16,7 +21,9 @@ class HousePriceApp extends StatelessWidget {
       title: 'HousePrice',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      home: const MainNavigation(),
+      initialRoute: initialRoute ?? AppRoutes.splash,
+      routes: AppRoutes.routes,
+      onGenerateRoute: AppRoutes.onGenerateRoute,
     );
   }
 }
