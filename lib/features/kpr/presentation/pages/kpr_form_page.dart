@@ -1,22 +1,24 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/app_sizes.dart';
-import '../../../core/constants/app_typography.dart';
-import '../../../core/widgets/custom_text_field.dart';
-import '../../../core/widgets/gradient_button.dart';
-import '../../../core/widgets/section_card.dart';
+import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_sizes.dart';
+import '../../../../core/constants/app_typography.dart';
+import '../../../../core/widgets/custom_text_field.dart';
+import '../../../../core/widgets/gradient_button.dart';
+import '../../../../core/widgets/section_card.dart';
+import '../../../history/presentation/widgets/history_bottom_sheet.dart';
+import 'kpr_result_page.dart';
 
 /// Layar Form Kalkulator KPR (FR-MOB-05).
 /// Referensi: design-system.md § 3B – Struktur Kartu Form Kalkulator KPR
-class KprFormScreen extends StatefulWidget {
-  const KprFormScreen({super.key});
+class KprFormPage extends StatefulWidget {
+  const KprFormPage({super.key});
 
   @override
-  State<KprFormScreen> createState() => _KprFormScreenState();
+  State<KprFormPage> createState() => _KprFormPageState();
 }
 
-class _KprFormScreenState extends State<KprFormScreen> {
+class _KprFormPageState extends State<KprFormPage> {
   int _selectedPeriodTab = 0; // 0 = Bulanan, 1 = Tahunan
 
   @override
@@ -58,40 +60,55 @@ class _KprFormScreenState extends State<KprFormScreen> {
                   label: 'Nilai Properti / Harga Rumah',
                   hint: 'Contoh: 2.500.000.000',
                   prefixIcon: Icons.home_rounded,
-                  suffixText: 'Rp',
                   keyboardType: TextInputType.number,
                 ),
                 const SizedBox(height: AppSizes.md),
                 const CustomTextField(
-                  label: 'Uang Muka (DP)',
-                  hint: 'Contoh: 500.000.000',
-                  prefixIcon: Icons.savings_rounded,
-                  suffixText: 'Rp',
+                  label: 'Uang Muka / DP (Rupiah atau %)',
+                  hint: 'Contoh: 500.000.000 (20%)',
+                  prefixIcon: Icons.payments_rounded,
+                  helperText: 'Standar minimum DP perbankan 10% – 20%',
                   keyboardType: TextInputType.number,
                 ),
                 const SizedBox(height: AppSizes.md),
                 const CustomTextField(
-                  label: 'Suku Bunga KPR per Tahun',
-                  hint: 'Contoh: 7.5',
+                  label: 'Suku Bunga Tetap per Tahun (%)',
+                  hint: 'Contoh: 6.5',
                   prefixIcon: Icons.percent_rounded,
-                  suffixText: '% / thn',
-                  helperText: 'Rata-rata suku bunga KPR bank: 7% – 12%',
-                  keyboardType: TextInputType.numberWithOptions(decimal: true),
-                ),
-                const SizedBox(height: AppSizes.md),
-                const CustomTextField(
-                  label: 'Jangka Waktu Kredit (Tenor)',
-                  hint: 'Contoh: 20',
-                  prefixIcon: Icons.calendar_month_rounded,
-                  suffixText: 'Tahun',
+                  suffixText: '% p.a.',
                   keyboardType: TextInputType.number,
                 ),
                 const SizedBox(height: AppSizes.md),
                 const CustomTextField(
-                  label: 'Pendapatan Bersih Bulanan',
+                  label: 'Tenor Pinjaman (Tahun)',
+                  hint: 'Contoh: 20',
+                  prefixIcon: Icons.calendar_today_rounded,
+                  suffixText: 'Tahun',
+                  helperText: 'Pilihan tenor umum: 10, 15, 20, 25 tahun',
+                  keyboardType: TextInputType.number,
+                ),
+              ],
+            ),
+
+            // ── Seksi 2: Profil Pendapatan ─────────────────────────────────
+            SectionCard(
+              icon: Icons.wallet_rounded,
+              title: 'Profil Pendapatan & Beban',
+              badge: 'Evaluasi DSR',
+              children: [
+                const CustomTextField(
+                  label: 'Total Pendapatan Bersih Bulanan',
                   hint: 'Contoh: 25.000.000',
-                  prefixIcon: Icons.wallet_rounded,
-                  suffixText: 'Rp',
+                  prefixIcon: Icons.attach_money_rounded,
+                  helperText: 'Akumulasi gaji pemohon + pasangan jika joint income',
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: AppSizes.md),
+                const CustomTextField(
+                  label: 'Total Cicilan Lain yang Sedang Berjalan',
+                  hint: 'Contoh: 0',
+                  prefixIcon: Icons.credit_card_rounded,
+                  helperText: 'Cicilan kendaraan, kartu kredit, pinjaman lain',
                   keyboardType: TextInputType.number,
                 ),
               ],
@@ -106,7 +123,17 @@ class _KprFormScreenState extends State<KprFormScreen> {
               text: 'Hitung Simulasi KPR',
               icon: Icons.calculate_rounded,
               onPressed: () {
-                // TODO: Navigasi ke KPR Result
+                HistoryBottomSheet.addRecord(
+                  type: 'kpr',
+                  location: 'Simulasi KPR - 20 Tahun',
+                  result: 8420000,
+                );
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const KprResultPage(),
+                  ),
+                );
               },
             ),
             const SizedBox(height: AppSizes.xxl),
@@ -214,3 +241,6 @@ class _KprFormScreenState extends State<KprFormScreen> {
     );
   }
 }
+
+/// Alias KprFormScreen agar kompatibel dengan penamaan lama.
+typedef KprFormScreen = KprFormPage;

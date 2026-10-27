@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/app_sizes.dart';
-import '../../../core/constants/app_typography.dart';
+import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_sizes.dart';
+import '../../../../core/constants/app_typography.dart';
+import '../../../../core/session/auth_session.dart';
+import '../../../../routes.dart';
+import '../../../history/presentation/widgets/history_bottom_sheet.dart';
 
 /// Layar Beranda Pasar Properti (FR-MOB-01).
 /// Menampilkan ringkasan rata-rata harga, tren per kota, dan filter statistik.
 /// Referensi: design-system.md § 5 – Tab 1 "Beranda"
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+class HomePage extends StatelessWidget {
+  const HomePage({super.key});
 
   // ── Mock Data ──────────────────────────────────────────────────────────────
   static final _currencyFormat = NumberFormat('#,###', 'id_ID');
@@ -59,9 +62,59 @@ class HomeScreen extends StatelessWidget {
             icon: const Icon(Icons.history_rounded, color: AppColors.textSecondary),
             tooltip: 'Riwayat',
             onPressed: () {
-              // TODO: Buka HistoryBottomSheet
+              HistoryBottomSheet.show(context);
             },
           ),
+          if (!AuthSession.isLoggedIn)
+            TextButton.icon(
+              icon: const Icon(Icons.login_rounded, size: 18, color: AppColors.primaryBlue),
+              label: Text(
+                'Masuk',
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.primaryBlue,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              onPressed: () => Navigator.pushNamed(context, AppRoutes.login),
+            ),
+          if (AuthSession.isLoggedIn)
+            IconButton(
+              icon: const Icon(Icons.logout_rounded, color: AppColors.alertRed),
+              tooltip: 'Keluar',
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Keluar dari Akun?'),
+                    content: Text(
+                      'Sesi akun ${AuthSession.currentUserEmail ?? ''} akan diakhiri.',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('Batal'),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          AuthSession.logout();
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).removeCurrentSnackBar();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Anda telah keluar dari akun demo.'),
+                              backgroundColor: AppColors.primaryNavy,
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                          Navigator.pushReplacementNamed(context, AppRoutes.main);
+                        },
+                        child: const Text('Keluar', style: TextStyle(color: AppColors.alertRed)),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
         ],
       ),
       body: SingleChildScrollView(
@@ -313,3 +366,6 @@ class HomeScreen extends StatelessWidget {
     );
   }
 }
+
+/// Alias untuk HomeScreen agar kompatibel dengan kode sebelumnya.
+typedef HomeScreen = HomePage;
