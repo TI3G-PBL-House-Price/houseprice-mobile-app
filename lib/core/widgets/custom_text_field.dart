@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../constants/app_colors.dart';
 import '../constants/app_sizes.dart';
 import '../constants/app_typography.dart';
 
-/// Form field rounded abu-abu dengan prefix icon.
-/// Referensi: design-system.md § 3 – Form & Penataan Kartu
 class CustomTextField extends StatelessWidget {
   const CustomTextField({
     super.key,
@@ -18,6 +17,10 @@ class CustomTextField extends StatelessWidget {
     this.controller,
     this.readOnly = false,
     this.onTap,
+    this.validator,
+    this.inputFormatters,
+    this.onChanged,
+    this.textInputAction,
   });
 
   final String label;
@@ -29,25 +32,33 @@ class CustomTextField extends StatelessWidget {
   final TextEditingController? controller;
   final bool readOnly;
   final VoidCallback? onTap;
+  final String? Function(String?)? validator;
+  final List<TextInputFormatter>? inputFormatters;
+  final ValueChanged<String>? onChanged;
+  final TextInputAction? textInputAction;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Label
-        Text(label, style: AppTypography.caption.copyWith(
-          color: AppColors.textSecondary,
-          fontWeight: FontWeight.w600,
-        )),
+        Text(
+          label,
+          style: AppTypography.caption.copyWith(
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         const SizedBox(height: AppSizes.xs),
-
-        // Field
-        TextField(
+        TextFormField(
           controller: controller,
           keyboardType: keyboardType,
           readOnly: readOnly,
           onTap: onTap,
+          validator: validator,
+          inputFormatters: inputFormatters,
+          onChanged: onChanged,
+          textInputAction: textInputAction,
           style: AppTypography.inputContent,
           decoration: InputDecoration(
             hintText: hint,
@@ -61,8 +72,6 @@ class CustomTextField extends StatelessWidget {
             ),
           ),
         ),
-
-        // Helper text
         if (helperText != null) ...[
           const SizedBox(height: AppSizes.xs),
           Text(

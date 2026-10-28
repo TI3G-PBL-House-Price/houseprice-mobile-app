@@ -117,7 +117,8 @@ class HistoryBottomSheet extends StatelessWidget {
                       vertical: AppSizes.sm,
                     ),
                     itemCount: _mockHistory.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: AppSizes.sm),
+                    separatorBuilder: (_, _) => const SizedBox(height: AppSizes.sm),
+
                     itemBuilder: (_, index) => _buildHistoryTile(_mockHistory[index]),
                   ),
           ),

@@ -6,6 +6,8 @@ import '../../../core/constants/app_typography.dart';
 import '../../../core/widgets/custom_text_field.dart';
 import '../../../core/widgets/gradient_button.dart';
 import '../../../core/widgets/section_card.dart';
+import 'result_screen.dart';
+
 
 /// Layar Form Prediksi ML (FR-MOB-02).
 /// Form input parameter properti untuk estimasi harga.
@@ -165,7 +167,7 @@ class _PredictFormScreenState extends State<PredictFormScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => const _ResultPlaceholder(),
+                    builder: (_) => const ResultScreen(),
                   ),
                 );
               },
@@ -237,15 +239,3 @@ class _PredictFormScreenState extends State<PredictFormScreen> {
   }
 }
 
-/// Placeholder navigasi ke result screen (sementara).
-class _ResultPlaceholder extends StatelessWidget {
-  const _ResultPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Hasil Prediksi')),
-      body: const Center(child: Text('Halaman Hasil Prediksi')),
-    );
-  }
-}
