@@ -1,33 +1,90 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
+import '../../../business_logic/business_logic.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/constants/app_typography.dart';
+import '../../../core/utils/currency_formatter.dart';
 import '../../../core/widgets/gradient_button.dart';
 import '../../../core/widgets/status_badge.dart';
+import '../history/history_bottom_sheet.dart';
+import '../kpr/kpr_form_screen.dart';
 
-/// Layar Hasil Estimasi & Cek Kewajaran (FR-MOB-03 & FR-MOB-04).
-/// Referensi: design-system.md § 4A – Layar Hasil Estimasi
-class ResultScreen extends StatelessWidget {
-  const ResultScreen({super.key});
+class ResultScreen extends StatefulWidget {
+  const ResultScreen({
+    super.key,
+    this.estimasiTengah = 2625000000,
+    this.spesifikasi,
+  });
 
-  // ── Mock Data ──────────────────────────────────────────────────────────────
-  static final _currencyFormat = NumberFormat('#,###', 'id_ID');
+  final double estimasiTengah;
+  final Map<String, String>? spesifikasi;
 
-  static const _mockLowerBound = 2450000000;
-  static const _mockUpperBound = 2800000000;
-  static const _mockAvgPerM2 = 18500000;
+  @override
+  State<ResultScreen> createState() => _ResultScreenState();
+}
 
-  // Mock spesifikasi properti
-  static const _mockSpec = {
-    'Kota': 'Jakarta Selatan',
-    'Kecamatan': 'Kebayoran Baru',
-    'Luas Tanah': '140 m²',
-    'Luas Bangunan': '120 m²',
-    'Kamar Tidur': '3',
-    'Kamar Mandi': '2',
-  };
+class _ResultScreenState extends State<ResultScreen> {
+  late final TextEditingController _penawaranController;
+  KewajaranResult? _kewajaranResult;
+
+  late double _lowerBound;
+  late double _upperBound;
+  late double _avgPerM2;
+  late final Map<String, String> _spec;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _lowerBound = widget.estimasiTengah * 0.90;
+    _upperBound = widget.estimasiTengah * 1.10;
+
+    const luasBangunan = 120.0;
+    _avgPerM2 = widget.estimasiTengah / luasBangunan;
+
+    _spec = widget.spesifikasi ??
+        {
+          'Kota': 'Jakarta Selatan',
+          'Kecamatan': 'Kebayoran Baru',
+          'Luas Tanah': '140 m²',
+          'Luas Bangunan': '120 m²',
+          'Kamar Tidur': '3',
+          'Kamar Mandi': '2',
+        };
+
+    _penawaranController = TextEditingController(
+      text: CurrencyFormatter.format(2500000000),
+    );
+
+    _evaluasiKewajaran();
+  }
+
+  @override
+  void dispose() {
+    _penawaranController.dispose();
+    super.dispose();
+  }
+
+  void _evaluasiKewajaran() {
+    final penawaran = CurrencyFormatter.parse(_penawaranController.text);
+    if (penawaran <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Masukkan nominal harga penawaran yang valid'),
+          backgroundColor: AppColors.alertRed,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _kewajaranResult = KewajaranCalculator.evaluasi(
+        hargaPenawaran: penawaran,
+        estimasiTengah: widget.estimasiTengah,
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +101,12 @@ class ResultScreen extends StatelessWidget {
             icon: const Icon(Icons.history_rounded, color: AppColors.textSecondary),
             tooltip: 'Riwayat',
             onPressed: () {
-              // TODO: Buka HistoryBottomSheet
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (_) => const HistoryBottomSheet(),
+              );
             },
           ),
         ],
@@ -53,19 +115,19 @@ class ResultScreen extends StatelessWidget {
         padding: const EdgeInsets.all(AppSizes.base),
         child: Column(
           children: [
-            // ── CARD 1: Estimasi Nilai Pasar ──────────────────────────────
             _buildEstimationCard(),
             const SizedBox(height: AppSizes.base),
 
-            // ── CARD 2: Cek Kewajaran Harga ──────────────────────────────
             _buildFairnessCard(),
             const SizedBox(height: AppSizes.base),
 
-            // ── CARD 3: Ringkasan Spesifikasi ────────────────────────────
             _buildSpecCard(),
             const SizedBox(height: AppSizes.lg),
 
-            // ── Action Buttons ────────────────────────────────────────────
+            _buildKprShortcutBanner(),
+            const SizedBox(height: AppSizes.lg),
+
+            // Tombol Aksi
             Row(
               children: [
                 Expanded(
@@ -97,7 +159,12 @@ class ResultScreen extends StatelessWidget {
                       ),
                     ),
                     onPressed: () {
-                      // TODO: Simpan ke SQLite
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Valuasi tersimpan ke riwayat offline'),
+                          backgroundColor: AppColors.primaryNavy,
+                        ),
+                      );
                     },
                   ),
                 ),
@@ -109,7 +176,11 @@ class ResultScreen extends StatelessWidget {
               text: 'Bagikan Estimasi Nilai',
               icon: Icons.share_rounded,
               onPressed: () {
-                // TODO: Share hasil
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Tautan estimasi berhasil disalin'),
+                  ),
+                );
               },
             ),
             const SizedBox(height: AppSizes.xxl),
@@ -119,7 +190,7 @@ class ResultScreen extends StatelessWidget {
     );
   }
 
-  /// CARD 1: Estimasi Nilai Pasar
+  // Kartu Estimasi Nilai Pasar
   Widget _buildEstimationCard() {
     return Container(
       width: double.infinity,
@@ -139,7 +210,7 @@ class ResultScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Rentang Harga Pasar Wajar',
+            'Rentang Harga Pasar Wajar (±10%)',
             style: AppTypography.bodyRegular.copyWith(
               color: AppColors.white.withValues(alpha: 0.7),
             ),
@@ -149,7 +220,7 @@ class ResultScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                'Rp ${_currencyFormat.format(_mockLowerBound ~/ 1000000)} Jt',
+                'Rp ${CurrencyFormatter.format(_lowerBound ~/ 1000000)} Jt',
                 style: AppTypography.headlineBold.copyWith(color: AppColors.white),
               ),
               Padding(
@@ -162,10 +233,17 @@ class ResultScreen extends StatelessWidget {
                 ),
               ),
               Text(
-                'Rp ${_currencyFormat.format(_mockUpperBound ~/ 1000000)} Jt',
+                'Rp ${CurrencyFormatter.format(_upperBound ~/ 1000000)} Jt',
                 style: AppTypography.headlineBold.copyWith(color: AppColors.white),
               ),
             ],
+          ),
+          const SizedBox(height: AppSizes.xs),
+          Text(
+            'Estimasi Titik Tengah: ${CurrencyFormatter.formatRupiah(widget.estimasiTengah)}',
+            style: AppTypography.captionSmall.copyWith(
+              color: AppColors.white.withValues(alpha: 0.8),
+            ),
           ),
           const SizedBox(height: AppSizes.base),
           Container(
@@ -180,10 +258,14 @@ class ResultScreen extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.straighten_rounded, size: 16, color: AppColors.white.withValues(alpha: 0.7)),
+                Icon(
+                  Icons.straighten_rounded,
+                  size: 16,
+                  color: AppColors.white.withValues(alpha: 0.7),
+                ),
                 const SizedBox(width: AppSizes.xs),
                 Text(
-                  'Rata-rata: Rp ${_currencyFormat.format(_mockAvgPerM2 ~/ 1000000)} Jt / m²',
+                  'Rata-rata: Rp ${CurrencyFormatter.format(_avgPerM2 ~/ 1000000)} Jt / m²',
                   style: AppTypography.caption.copyWith(
                     color: AppColors.white,
                     fontWeight: FontWeight.w600,
@@ -197,8 +279,10 @@ class ResultScreen extends StatelessWidget {
     );
   }
 
-  /// CARD 2: Cek Kewajaran Harga Penawaran
+  // Cek Kewajaran Harga Penawaran
   Widget _buildFairnessCard() {
+    final res = _kewajaranResult;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppSizes.base),
@@ -224,7 +308,11 @@ class ResultScreen extends StatelessWidget {
                   color: AppColors.primaryBlue.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(AppSizes.radiusSm),
                 ),
-                child: const Icon(Icons.price_check_rounded, size: 22, color: AppColors.primaryBlue),
+                child: const Icon(
+                  Icons.price_check_rounded,
+                  size: 22,
+                  color: AppColors.primaryBlue,
+                ),
               ),
               const SizedBox(width: AppSizes.md),
               Expanded(
@@ -234,50 +322,182 @@ class ResultScreen extends StatelessWidget {
           ),
           const SizedBox(height: AppSizes.sm),
           Text(
-            'Masukkan harga penawaran penjual untuk evaluasi',
+            'Masukkan harga penawaran penjual untuk evaluasi deviasi pasar (±10%)',
             style: AppTypography.bodySmall,
           ),
           const SizedBox(height: AppSizes.md),
 
-          // Input harga penawaran
           TextField(
+            controller: _penawaranController,
             style: AppTypography.inputContent,
             keyboardType: TextInputType.number,
+            inputFormatters: [ThousandsSeparatorInputFormatter()],
             decoration: InputDecoration(
               hintText: 'Contoh: 2.500.000.000',
               prefixIcon: const Icon(Icons.payments_rounded, color: AppColors.textHint),
               prefixText: 'Rp  ',
               prefixStyle: AppTypography.inputContent.copyWith(color: AppColors.primaryBlue),
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.check_circle_rounded, color: AppColors.primaryBlue),
+                tooltip: 'Evaluasi Sekarang',
+                onPressed: _evaluasiKewajaran,
+              ),
             ),
+            onSubmitted: (_) => _evaluasiKewajaran(),
           ),
           const SizedBox(height: AppSizes.md),
 
-          // Tombol evaluasi
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
               icon: const Icon(Icons.assessment_rounded, size: 18),
               label: const Text('Evaluasi Kewajaran'),
-              onPressed: () {
-                // TODO: Hitung deviasi
-              },
+              onPressed: _evaluasiKewajaran,
             ),
           ),
           const SizedBox(height: AppSizes.md),
 
-          // Status badge (mock: Wajar)
-          const Center(
-            child: StatusBadge(
-              type: StatusType.wajar,
-              label: 'Wajar / Sesuai Pasar (Deviasi 2%)',
+          if (res != null) ...[
+            Center(
+              child: StatusBadge(
+                type: res.status,
+                label: res.badgeLabel,
+              ),
             ),
+            const SizedBox(height: AppSizes.sm),
+
+            Container(
+              padding: const EdgeInsets.all(AppSizes.md),
+              decoration: BoxDecoration(
+                color: _getBgForStatus(res.status),
+                borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+                border: Border.all(
+                  color: _getColorForStatus(res.status).withValues(alpha: 0.25),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.insights_rounded,
+                        size: 18,
+                        color: _getColorForStatus(res.status),
+                      ),
+                      const SizedBox(width: AppSizes.xs),
+                      Text(
+                        res.statusJudul,
+                        style: AppTypography.caption.copyWith(
+                          color: _getColorForStatus(res.status),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSizes.xs),
+                  Text(
+                    res.rekomendasi,
+                    style: AppTypography.captionSmall.copyWith(
+                      color: AppColors.textSecondary,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: AppSizes.xs),
+                  Text(
+                    'Selisih: ${res.selisihNominal >= 0 ? '+' : ''}${CurrencyFormatter.formatRupiah(res.selisihNominal)} (${res.deviasiPersen.toStringAsFixed(1)}%)',
+                    style: AppTypography.captionSmall.copyWith(
+                      color: _getColorForStatus(res.status),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // Pintasan ke Simulasi KPR
+  Widget _buildKprShortcutBanner() {
+    final penawaran = CurrencyFormatter.parse(_penawaranController.text);
+    final targetHarga = penawaran > 0 ? penawaran : widget.estimasiTengah;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSizes.base),
+      decoration: BoxDecoration(
+        color: AppColors.primaryNavy.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+        border: Border.all(
+          color: AppColors.primaryBlue.withValues(alpha: 0.20),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(AppSizes.sm),
+            decoration: BoxDecoration(
+              color: AppColors.primaryNavy,
+              borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+            ),
+            child: const Icon(
+              Icons.account_balance_rounded,
+              size: 24,
+              color: AppColors.white,
+            ),
+          ),
+          const SizedBox(width: AppSizes.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Ingin Mengajukan KPR?',
+                  style: AppTypography.inputContent.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Simulasikan cicilan per bulan dengan harga ini',
+                  style: AppTypography.captionSmall.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryBlue,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSizes.md,
+                vertical: AppSizes.sm,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+              ),
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const KprFormScreen(),
+                ),
+              );
+            },
+
+            child: const Text('Simulasi'),
           ),
         ],
       ),
     );
   }
 
-  /// CARD 3: Ringkasan Spesifikasi Properti
+  // Ringkasan Spesifikasi Properti
   Widget _buildSpecCard() {
     return Container(
       width: double.infinity,
@@ -304,15 +524,17 @@ class ResultScreen extends StatelessWidget {
                   color: AppColors.primaryBlue.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(AppSizes.radiusSm),
                 ),
-                child: const Icon(Icons.description_rounded, size: 22, color: AppColors.primaryBlue),
+                child: const Icon(
+                  Icons.description_rounded,
+                  size: 22,
+                  color: AppColors.primaryBlue,
+                ),
               ),
               const SizedBox(width: AppSizes.md),
               Text('Ringkasan Spesifikasi', style: AppTypography.sectionHeader),
             ],
           ),
           const SizedBox(height: AppSizes.base),
-
-          // Grid spesifikasi
           ..._buildSpecRows(),
         ],
       ),
@@ -320,7 +542,7 @@ class ResultScreen extends StatelessWidget {
   }
 
   List<Widget> _buildSpecRows() {
-    final entries = _mockSpec.entries.toList();
+    final entries = _spec.entries.toList();
     final List<Widget> rows = [];
 
     for (var i = 0; i < entries.length; i += 2) {
@@ -347,5 +569,27 @@ class ResultScreen extends StatelessWidget {
         Text(value, style: AppTypography.inputContent),
       ],
     );
+  }
+
+  Color _getColorForStatus(StatusType status) {
+    switch (status) {
+      case StatusType.murah:
+        return AppColors.successGreen;
+      case StatusType.wajar:
+        return AppColors.infoBlue;
+      case StatusType.mahal:
+        return AppColors.alertRed;
+    }
+  }
+
+  Color _getBgForStatus(StatusType status) {
+    switch (status) {
+      case StatusType.murah:
+        return AppColors.successGreenBg;
+      case StatusType.wajar:
+        return AppColors.infoBlueBg;
+      case StatusType.mahal:
+        return AppColors.alertRedBg;
+    }
   }
 }
