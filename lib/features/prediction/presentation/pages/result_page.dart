@@ -1,39 +1,101 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/session/auth_session.dart';
-import '../../../../core/widgets/gradient_button.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../../../routes.dart';
 import '../../../history/presentation/widgets/history_bottom_sheet.dart';
+import '../../data/prediction_result_data.dart';
 
 /// Layar Hasil Estimasi & Cek Kewajaran (FR-MOB-03 & FR-MOB-04).
-/// Referensi: design-system.md § 4A – Layar Hasil Estimasi
-class ResultPage extends StatelessWidget {
-  const ResultPage({super.key});
+class ResultPage extends StatefulWidget {
+  const ResultPage({super.key, this.data = PredictionResultData.sample});
 
-  // ── Mock Data ──────────────────────────────────────────────────────────────
+  final PredictionResultData data;
+
+  @override
+  State<ResultPage> createState() => _ResultPageState();
+}
+
+class _ResultPageState extends State<ResultPage> {
   static final _currencyFormat = NumberFormat('#,###', 'id_ID');
 
-  static const _mockLowerBound = 2450000000;
-  static const _mockUpperBound = 2800000000;
-  static const _mockAvgPerM2 = 18500000;
+  bool _saved = false;
 
-  // Mock spesifikasi properti
-  static const _mockSpec = {
-    'Kota': 'Jakarta Selatan',
-    'Kecamatan': 'Kebayoran Baru',
-    'Luas Tanah': '140 m²',
-    'Luas Bangunan': '120 m²',
-    'Kamar Tidur': '3',
-    'Kamar Mandi': '2',
-  };
+  String _short(int v) =>
+      'Rp ${(v / 1000000000).toStringAsFixed(2).replaceAll('.', ',')} M';
+
+  String _full(int v) => 'Rp ${_currencyFormat.format(v)}';
+
+  String _perM2(int v) =>
+      'Rp ${(v / 1000000).toStringAsFixed(1).replaceAll('.', ',')} Jt / m\u00B2';
+
+  void _save() {
+    if (_saved) return;
+
+    if (!AuthSession.isLoggedIn) {
+      ScaffoldMessenger.of(context)
+        ..removeCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Silakan masuk terlebih dahulu untuk menyimpan estimasi.'),
+            backgroundColor: AppColors.primaryNavy,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      Navigator.pushNamed(context, AppRoutes.login);
+      return;
+    }
+
+    final d = widget.data;
+    HistoryBottomSheet.addRecord(
+      type: 'prediksi',
+      location: '${d.city} - ${d.district}',
+      result: d.midPrice,
+    );
+    setState(() => _saved = true);
+
+    ScaffoldMessenger.of(context)
+      ..removeCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('Estimasi tersimpan ke Riwayat'),
+          backgroundColor: AppColors.primaryNavy,
+          duration: Duration(seconds: 2),
+        ),
+      );
+  }
+
+  Future<void> _share() async {
+    final d = widget.data;
+    final text = 'Estimasi Nilai Pasar Properti\n'
+        '${d.district}, ${d.city}\n'
+        'Luas tanah ${d.landArea} m\u00B2, luas bangunan ${d.buildingArea} m\u00B2\n'
+        '${_short(d.lowerBound)} sampai ${_short(d.upperBound)}\n'
+        '(${_full(d.lowerBound)} - ${_full(d.upperBound)})';
+
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context)
+      ..removeCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('Estimasi disalin ke clipboard'),
+          backgroundColor: AppColors.primaryNavy,
+          duration: Duration(seconds: 2),
+        ),
+      );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final d = widget.data;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -69,103 +131,118 @@ class ResultPage extends StatelessWidget {
           const SizedBox(width: AppSizes.xs),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSizes.base),
-        child: Column(
-          children: [
-            // ── CARD 1: Estimasi Nilai Pasar ──────────────────────────────
-            _buildEstimationCard(),
-            const SizedBox(height: AppSizes.base),
-
-            // ── CARD 2: Cek Kewajaran Harga ──────────────────────────────
-            _buildFairnessCard(),
-            const SizedBox(height: AppSizes.base),
-
-            // ── CARD 3: Ringkasan Spesifikasi ────────────────────────────
-            _buildSpecCard(),
-            const SizedBox(height: AppSizes.lg),
-
-            // ── Action Button: Hitung Ulang ────────────────────────────────
-            GradientButton(
-              text: 'Hitung Ulang',
-              icon: Icons.refresh_rounded,
-              onPressed: () => Navigator.pop(context),
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(AppSizes.base),
+              child: Column(
+                children: [
+                  _buildEstimationCard(d),
+                  const SizedBox(height: AppSizes.base),
+                  _buildDataCard(d),
+                  const SizedBox(height: AppSizes.base),
+                  _buildFairnessCard(),
+                  const SizedBox(height: AppSizes.base),
+                ],
+              ),
             ),
-            const SizedBox(height: AppSizes.xxl),
-          ],
-        ),
+          ),
+          _buildActions(),
+        ],
       ),
     );
   }
 
+  BoxDecoration _cardDecoration() {
+    return BoxDecoration(
+      color: AppColors.cardBackground,
+      borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+      boxShadow: [
+        BoxShadow(
+          color: AppColors.primaryNavy.withValues(alpha: 0.06),
+          blurRadius: 12,
+          offset: const Offset(0, 2),
+        ),
+      ],
+    );
+  }
+
   /// CARD 1: Estimasi Nilai Pasar
-  Widget _buildEstimationCard() {
+  Widget _buildEstimationCard(PredictionResultData d) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(AppSizes.xl),
-      decoration: BoxDecoration(
-        color: AppColors.primaryNavy,
-        borderRadius: BorderRadius.circular(AppSizes.radiusLg),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primaryNavy.withValues(alpha: 0.30),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
+      decoration: _cardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Rentang Harga Pasar Wajar',
-            style: AppTypography.bodyRegular.copyWith(
-              color: AppColors.white.withValues(alpha: 0.7),
+          Padding(
+            padding: const EdgeInsets.all(AppSizes.base),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.bar_chart_rounded, size: 18, color: AppColors.primaryBlue),
+                    const SizedBox(width: AppSizes.xs),
+                    Text(
+                      'ESTIMASI NILAI PASAR',
+                      style: AppTypography.caption.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+                const Divider(height: AppSizes.lg),
+                Text('Rentang Harga Pasar Wajar', style: AppTypography.bodySmall),
+                const SizedBox(height: AppSizes.sm),
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.end,
+                  spacing: AppSizes.sm,
+                  children: [
+                    Text(_short(d.lowerBound), style: AppTypography.headlineBold),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text('sampai', style: AppTypography.bodySmall),
+                    ),
+                    Text(
+                      _short(d.upperBound),
+                      style: AppTypography.headlineBold.copyWith(
+                        color: AppColors.primaryBlue,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSizes.xs),
+                Text(
+                  '(${_full(d.lowerBound)} - ${_full(d.upperBound)})',
+                  style: AppTypography.captionSmall,
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: AppSizes.sm),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                'Rp ${_currencyFormat.format(_mockLowerBound ~/ 1000000)} Jt',
-                style: AppTypography.headlineBold.copyWith(color: AppColors.white),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSizes.sm),
-                child: Text(
-                  'sampai',
-                  style: AppTypography.bodySmall.copyWith(
-                    color: AppColors.white.withValues(alpha: 0.6),
-                  ),
-                ),
-              ),
-              Text(
-                'Rp ${_currencyFormat.format(_mockUpperBound ~/ 1000000)} Jt',
-                style: AppTypography.headlineBold.copyWith(color: AppColors.white),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSizes.base),
           Container(
+            width: double.infinity,
             padding: const EdgeInsets.symmetric(
-              horizontal: AppSizes.md,
-              vertical: AppSizes.sm,
+              horizontal: AppSizes.base,
+              vertical: AppSizes.md,
             ),
             decoration: BoxDecoration(
-              color: AppColors.white.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+              color: AppColors.background,
+              borderRadius: BorderRadius.vertical(
+                bottom: Radius.circular(AppSizes.radiusLg),
+              ),
             ),
             child: Row(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(Icons.straighten_rounded, size: 16, color: AppColors.white.withValues(alpha: 0.7)),
-                const SizedBox(width: AppSizes.xs),
+                Text('Harga Rata-Rata Bangunan', style: AppTypography.bodySmall),
                 Text(
-                  'Rata-rata: Rp ${_currencyFormat.format(_mockAvgPerM2 ~/ 1000000)} Jt / m²',
+                  _perM2(d.avgPerM2),
                   style: AppTypography.caption.copyWith(
-                    color: AppColors.white,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ],
@@ -176,22 +253,95 @@ class ResultPage extends StatelessWidget {
     );
   }
 
-  /// CARD 2: Cek Kewajaran Harga Penawaran
+  /// CARD 2: Berdasarkan Data Properti
+  Widget _buildDataCard(PredictionResultData d) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSizes.base),
+      decoration: _cardDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.fact_check_rounded, size: 22, color: AppColors.primaryBlue),
+              const SizedBox(width: AppSizes.sm),
+              Expanded(
+                child: Text('Berdasarkan Data Properti', style: AppTypography.sectionHeader),
+              ),
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Text(
+                  'Ubah',
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.primaryBlue,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSizes.md),
+          _InfoTile(icon: Icons.location_city_rounded, label: 'Kota', value: d.city),
+          const SizedBox(height: AppSizes.sm),
+          _InfoTile(icon: Icons.location_on_rounded, label: 'Kecamatan', value: d.district),
+          const SizedBox(height: AppSizes.sm),
+          Row(
+            children: [
+              Expanded(
+                child: _InfoTile(
+                  icon: Icons.crop_landscape_rounded,
+                  label: 'Luas Tanah',
+                  value: '${d.landArea} m\u00B2',
+                ),
+              ),
+              const SizedBox(width: AppSizes.sm),
+              Expanded(
+                child: _InfoTile(
+                  icon: Icons.home_rounded,
+                  label: 'Luas Bangunan',
+                  value: '${d.buildingArea} m\u00B2',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSizes.sm),
+          Row(
+            children: [
+              Expanded(
+                child: _InfoTile(
+                  icon: Icons.bed_rounded,
+                  label: 'Kamar Tidur',
+                  value: '${d.bedrooms} Kamar',
+                ),
+              ),
+              const SizedBox(width: AppSizes.sm),
+              Expanded(
+                child: _InfoTile(
+                  icon: Icons.shower_rounded,
+                  label: 'Kamar Mandi',
+                  value: '${d.bathrooms} Kamar',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSizes.sm),
+          _InfoTile(
+            icon: Icons.directions_car_rounded,
+            label: 'Kapasitas Garasi',
+            value: '${d.garage} Mobil / Carport',
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// CARD 3: Cek Kewajaran Harga Penawaran (dari fitur price-fairness-check)
   Widget _buildFairnessCard() {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppSizes.base),
-      decoration: BoxDecoration(
-        color: AppColors.cardBackground,
-        borderRadius: BorderRadius.circular(AppSizes.radiusLg),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primaryNavy.withValues(alpha: 0.06),
-            blurRadius: 12,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+      decoration: _cardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -217,8 +367,6 @@ class ResultPage extends StatelessWidget {
             style: AppTypography.bodySmall,
           ),
           const SizedBox(height: AppSizes.md),
-
-          // Input harga penawaran
           TextField(
             style: AppTypography.inputContent,
             keyboardType: TextInputType.number,
@@ -230,8 +378,6 @@ class ResultPage extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSizes.md),
-
-          // Tombol evaluasi
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
@@ -243,8 +389,6 @@ class ResultPage extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSizes.md),
-
-          // Status badge (mock: Wajar)
           const Center(
             child: StatusBadge(
               type: StatusType.wajar,
@@ -256,75 +400,143 @@ class ResultPage extends StatelessWidget {
     );
   }
 
-  /// CARD 3: Ringkasan Spesifikasi Properti
-  Widget _buildSpecCard() {
+  /// Tombol aksi bawah: Hitung Ulang, Simpan, Bagikan
+  Widget _buildActions() {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSizes.base),
-      decoration: BoxDecoration(
-        color: AppColors.cardBackground,
-        borderRadius: BorderRadius.circular(AppSizes.radiusLg),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primaryNavy.withValues(alpha: 0.06),
-            blurRadius: 12,
-            offset: const Offset(0, 2),
-          ),
-        ],
+      color: AppColors.cardBackground,
+      padding: const EdgeInsets.fromLTRB(
+        AppSizes.base,
+        AppSizes.md,
+        AppSizes.base,
+        AppSizes.md,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(AppSizes.sm),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryBlue.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: _secondaryButton(
+                    icon: Icons.refresh_rounded,
+                    label: 'Hitung Ulang',
+                    onPressed: () => Navigator.pop(context),
+                  ),
                 ),
-                child: const Icon(Icons.description_rounded, size: 22, color: AppColors.primaryBlue),
+                const SizedBox(width: AppSizes.md),
+                Expanded(
+                  child: _secondaryButton(
+                    icon: _saved
+                        ? Icons.bookmark_rounded
+                        : Icons.bookmark_border_rounded,
+                    label: _saved ? 'Tersimpan' : 'Simpan',
+                    onPressed: _save,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSizes.md),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: _share,
+                icon: const Icon(Icons.ios_share_rounded, size: 18),
+                label: const Text('Bagikan Estimasi Nilai'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryNavy,
+                  foregroundColor: AppColors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+                  ),
+                ),
               ),
-              const SizedBox(width: AppSizes.md),
-              Text('Ringkasan Spesifikasi', style: AppTypography.sectionHeader),
-            ],
-          ),
-          const SizedBox(height: AppSizes.base),
-
-          // Grid spesifikasi
-          ..._buildSpecRows(),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  List<Widget> _buildSpecRows() {
-    final entries = _mockSpec.entries.toList();
-    final List<Widget> rows = [];
-
-    for (var i = 0; i < entries.length; i += 2) {
-      rows.add(Padding(
-        padding: const EdgeInsets.only(bottom: AppSizes.md),
-        child: Row(
-          children: [
-            Expanded(child: _buildSpecItem(entries[i].key, entries[i].value)),
-            if (i + 1 < entries.length)
-              Expanded(child: _buildSpecItem(entries[i + 1].key, entries[i + 1].value)),
-          ],
+  Widget _secondaryButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+  }) {
+    return SizedBox(
+      height: 48,
+      child: ElevatedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon, size: 18),
+        label: Text(label),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.inputSurface,
+          foregroundColor: AppColors.textPrimary,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+          ),
         ),
-      ));
-    }
-    return rows;
+      ),
+    );
   }
+}
 
-  Widget _buildSpecItem(String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: AppTypography.caption),
-        const SizedBox(height: 2),
-        Text(value, style: AppTypography.inputContent),
-      ],
+class _InfoTile extends StatelessWidget {
+  const _InfoTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSizes.sm),
+      decoration: BoxDecoration(
+        color: AppColors.inputSurface,
+        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(AppSizes.sm),
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+            ),
+            child: Icon(icon, size: 18, color: AppColors.primaryBlue),
+          ),
+          const SizedBox(width: AppSizes.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: AppTypography.captionSmall,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: AppTypography.caption.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

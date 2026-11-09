@@ -6,12 +6,11 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../core/widgets/custom_text_field.dart';
 import '../../../../core/widgets/gradient_button.dart';
 import '../../../../core/widgets/section_card.dart';
-import '../../../history/presentation/widgets/history_bottom_sheet.dart';
+import '../../data/prediction_result_data.dart';
 import 'result_page.dart';
 
 /// Layar Form Prediksi ML (FR-MOB-02).
 /// Form input parameter properti untuk estimasi harga.
-/// Referensi: design-system.md § 3A – Struktur Kartu Form Input Properti
 class PredictFormPage extends StatefulWidget {
   const PredictFormPage({super.key});
 
@@ -20,7 +19,7 @@ class PredictFormPage extends StatefulWidget {
 }
 
 class _PredictFormPageState extends State<PredictFormPage> {
-  // ── Mock Data Dropdown ─────────────────────────────────────────────────────
+  // Mock data dropdown
   static const _kotaOptions = [
     'Jakarta Selatan',
     'Jakarta Barat',
@@ -65,7 +64,7 @@ class _PredictFormPageState extends State<PredictFormPage> {
             ),
             const SizedBox(height: AppSizes.lg),
 
-            // ── Seksi 1: Wilayah & Lokasi ──────────────────────────────────
+            // Seksi 1: Wilayah & Lokasi
             SectionCard(
               icon: Icons.location_on_rounded,
               title: 'Wilayah & Lokasi',
@@ -102,7 +101,7 @@ class _PredictFormPageState extends State<PredictFormPage> {
               ],
             ),
 
-            // ── Seksi 2: Tata Ruang, Kamar & Garasi ────────────────────────
+            // Seksi 2: Tata Ruang, Kamar & Garasi
             SectionCard(
               icon: Icons.grid_view_rounded,
               title: 'Tata Ruang & Fasilitas',
@@ -131,18 +130,18 @@ class _PredictFormPageState extends State<PredictFormPage> {
               ],
             ),
 
-            // ── Seksi 3: Dimensi Luas ──────────────────────────────────────
+            // Seksi 3: Dimensi Luas
             SectionCard(
               icon: Icons.square_foot_rounded,
               title: 'Dimensi Luas',
-              badge: 'Metric (m²)',
+              badge: 'Metric (m\u00B2)',
               children: [
                 const CustomTextField(
                   label: 'Luas Tanah',
                   hint: 'Contoh: 140',
                   prefixIcon: Icons.crop_landscape_rounded,
-                  suffixText: 'm²',
-                  helperText: 'Min. 30 m²',
+                  suffixText: 'm\u00B2',
+                  helperText: 'Min. 30 m\u00B2',
                   keyboardType: TextInputType.number,
                 ),
                 const SizedBox(height: AppSizes.md),
@@ -150,7 +149,7 @@ class _PredictFormPageState extends State<PredictFormPage> {
                   label: 'Luas Bangunan',
                   hint: 'Contoh: 120',
                   prefixIcon: Icons.home_rounded,
-                  suffixText: 'm²',
+                  suffixText: 'm\u00B2',
                   helperText: 'Akumulasi seluruh lantai',
                   keyboardType: TextInputType.number,
                 ),
@@ -159,23 +158,22 @@ class _PredictFormPageState extends State<PredictFormPage> {
 
             const SizedBox(height: AppSizes.sm),
 
-            // ── Tombol CTA ─────────────────────────────────────────────────
+            // Tombol CTA
             GradientButton(
               text: 'Prediksi Harga',
               icon: Icons.auto_awesome_rounded,
               onPressed: () {
-                final location = (_selectedKota != null && _selectedKecamatan != null)
-                    ? '$_selectedKota - $_selectedKecamatan'
-                    : (_selectedKota ?? 'Jakarta Selatan - Kebayoran Baru');
-                HistoryBottomSheet.addRecord(
-                  type: 'prediksi',
-                  location: location,
-                  result: 2650000000,
-                );
+                final sample = PredictionResultData.sample;
+                final data = _selectedKota == null
+                    ? sample
+                    : sample.copyWith(
+                        city: _selectedKota,
+                        district: _selectedKecamatan ?? '-',
+                      );
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => const ResultPage(),
+                    builder: (_) => ResultPage(data: data),
                   ),
                 );
               },
