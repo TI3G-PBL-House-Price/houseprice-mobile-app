@@ -6,11 +6,13 @@ import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/session/auth_session.dart';
 import '../../../../routes.dart';
+import '../../data/history_record.dart';
+import '../../data/history_storage.dart';
 
 /// Bottom sheet daftar riwayat prediksi tersimpan lokal (FR-MOB-06).
 /// Pengguna harus login terlebih dahulu untuk mengakses riwayat kalkulasi.
-/// Referensi: design-system.md § 5 – Akses Riwayat Lokal
-class HistoryBottomSheet extends StatelessWidget {
+/// Data disimpan di perangkat lewat [HistoryStorage].
+class HistoryBottomSheet extends StatefulWidget {
   const HistoryBottomSheet({super.key});
 
   static final _currencyFormat = NumberFormat('#,###', 'id_ID');
@@ -30,65 +32,29 @@ class HistoryBottomSheet extends StatelessWidget {
     }
   }
 
-  static final List<Map<String, dynamic>> _mockHistory = [
-    {
-      'type': 'prediksi',
-      'location': 'Jakarta Selatan - Kebayoran Baru',
-      'result': 2650000000,
-      'date': DateTime(2026, 10, 22, 14, 30),
-    },
-    {
-      'type': 'kpr',
-      'location': 'Simulasi KPR - 20 Tahun',
-      'result': 8420000,
-      'date': DateTime(2026, 10, 21, 10, 15),
-    },
-    {
-      'type': 'prediksi',
-      'location': 'Jakarta Pusat - Menteng',
-      'result': 4100000000,
-      'date': DateTime(2026, 10, 20, 9, 0),
-    },
-  ];
+  /// Memuat riwayat dari penyimpanan lokal.
+  static Future<void> load() => HistoryStorage.load();
 
-  /// Menambahkan kalkulasi baru ke riwayat secara otomatis.
+  /// Menambahkan kalkulasi baru ke riwayat dan menyimpannya di perangkat.
   static void addRecord({
     required String type,
     required String location,
     required int result,
     DateTime? date,
   }) {
-    _mockHistory.insert(0, {
-      'type': type,
-      'location': location,
-      'result': result,
-      'date': date ?? DateTime.now(),
-    });
+    HistoryStorage.add(
+      HistoryRecord(
+        type: type,
+        location: location,
+        result: result,
+        date: date ?? DateTime.now(),
+      ),
+    );
   }
 
   /// Mengembalikan data riwayat ke kondisi awal (untuk testing).
   static void resetHistory() {
-    _mockHistory.clear();
-    _mockHistory.addAll([
-      {
-        'type': 'prediksi',
-        'location': 'Jakarta Selatan - Kebayoran Baru',
-        'result': 2650000000,
-        'date': DateTime(2026, 10, 22, 14, 30),
-      },
-      {
-        'type': 'kpr',
-        'location': 'Simulasi KPR - 20 Tahun',
-        'result': 8420000,
-        'date': DateTime(2026, 10, 21, 10, 15),
-      },
-      {
-        'type': 'prediksi',
-        'location': 'Jakarta Pusat - Menteng',
-        'result': 4100000000,
-        'date': DateTime(2026, 10, 20, 9, 0),
-      },
-    ]);
+    HistoryStorage.reset();
   }
 
   /// Menampilkan bottom sheet riwayat dengan proteksi autentikasi.
@@ -117,7 +83,23 @@ class HistoryBottomSheet extends StatelessWidget {
   }
 
   @override
+  State<HistoryBottomSheet> createState() => _HistoryBottomSheetState();
+}
+
+class _HistoryBottomSheetState extends State<HistoryBottomSheet> {
+  @override
+  void initState() {
+    super.initState();
+    // Muat data tersimpan di belakang layar, lalu segarkan daftar.
+    HistoryStorage.load().then((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final records = HistoryStorage.records;
+
     return Container(
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.70,
@@ -131,7 +113,7 @@ class HistoryBottomSheet extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // ── Drag Handle ──────────────────────────────────────────────────
+          // Drag handle
           Container(
             margin: const EdgeInsets.symmetric(vertical: AppSizes.md),
             width: 40,
@@ -142,7 +124,7 @@ class HistoryBottomSheet extends StatelessWidget {
             ),
           ),
 
-          // ── Header ───────────────────────────────────────────────────────
+          // Header
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSizes.base),
             child: Row(
@@ -166,7 +148,7 @@ class HistoryBottomSheet extends StatelessWidget {
                     children: [
                       Text('Riwayat Kalkulasi', style: AppTypography.sectionHeader),
                       Text(
-                        '${_mockHistory.length} catatan tersimpan',
+                        '${records.length} catatan tersimpan',
                         style: AppTypography.captionSmall,
                       ),
                     ],
@@ -182,9 +164,9 @@ class HistoryBottomSheet extends StatelessWidget {
 
           const Divider(height: AppSizes.base),
 
-          // ── Daftar Riwayat ───────────────────────────────────────────────
+          // Daftar riwayat
           Flexible(
-            child: _mockHistory.isEmpty
+            child: records.isEmpty
                 ? Center(
                     child: Padding(
                       padding: const EdgeInsets.all(AppSizes.xxl),
@@ -218,9 +200,31 @@ class HistoryBottomSheet extends StatelessWidget {
                       horizontal: AppSizes.base,
                       vertical: AppSizes.sm,
                     ),
-                    itemCount: _mockHistory.length,
+                    itemCount: records.length,
                     separatorBuilder: (_, _) => const SizedBox(height: AppSizes.sm),
-                    itemBuilder: (_, index) => _buildHistoryTile(_mockHistory[index]),
+                    itemBuilder: (_, index) {
+                      final record = records[index];
+                      return Dismissible(
+                        key: ObjectKey(record),
+                        direction: DismissDirection.endToStart,
+                        background: Container(
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.only(right: AppSizes.base),
+                          decoration: BoxDecoration(
+                            color: AppColors.alertRed,
+                            borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+                          ),
+                          child: const Icon(
+                            Icons.delete_rounded,
+                            color: AppColors.white,
+                          ),
+                        ),
+                        onDismissed: (_) {
+                          setState(() => HistoryStorage.remove(record));
+                        },
+                        child: _buildHistoryTile(record),
+                      );
+                    },
                   ),
           ),
         ],
@@ -228,8 +232,8 @@ class HistoryBottomSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildHistoryTile(Map<String, dynamic> item) {
-    final isPrediction = item['type'] == 'prediksi';
+  Widget _buildHistoryTile(HistoryRecord item) {
+    final isPrediction = item.isPrediction;
 
     return Container(
       padding: const EdgeInsets.all(AppSizes.md),
@@ -262,7 +266,7 @@ class HistoryBottomSheet extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  item['location'] as String,
+                  item.location,
                   style: AppTypography.caption.copyWith(
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
@@ -272,7 +276,7 @@ class HistoryBottomSheet extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSizes.xs / 2),
                 Text(
-                  _formatDate(item['date'] as DateTime),
+                  HistoryBottomSheet._formatDate(item.date),
                   style: AppTypography.captionSmall,
                 ),
               ],
@@ -285,8 +289,8 @@ class HistoryBottomSheet extends StatelessWidget {
             children: [
               Text(
                 isPrediction
-                    ? 'Rp ${((item['result'] as int) / 1000000000).toStringAsFixed(2)} M'
-                    : 'Rp ${_currencyFormat.format(item['result'])} / bln',
+                    ? 'Rp ${(item.result / 1000000000).toStringAsFixed(2)} M'
+                    : 'Rp ${HistoryBottomSheet._currencyFormat.format(item.result)} / bln',
                 style: AppTypography.caption.copyWith(
                   fontWeight: FontWeight.w700,
                   color: isPrediction ? AppColors.primaryNavy : AppColors.primaryBlue,

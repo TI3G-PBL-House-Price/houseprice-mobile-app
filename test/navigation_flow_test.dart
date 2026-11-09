@@ -191,7 +191,7 @@ void main() {
       expect(find.text('Jakarta Pusat - Menteng'), findsOneWidget);
     });
 
-    testWidgets('9. ResultPage has only "Hitung Ulang" button (no "Simpan" or "Bagikan Estimasi Nilai")', (WidgetTester tester) async {
+    testWidgets('9. ResultPage has "Hitung Ulang", "Simpan", and "Bagikan Estimasi Nilai" buttons', (WidgetTester tester) async {
       await tester.pumpWidget(
         const MaterialApp(
           home: ResultPage(),
@@ -199,12 +199,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Verify 'Hitung Ulang' exists
+      // Verify action buttons sesuai desain Figma
       expect(find.text('Hitung Ulang'), findsOneWidget);
-
-      // Verify 'Simpan' and 'Bagikan Estimasi Nilai' are removed
-      expect(find.text('Simpan'), findsNothing);
-      expect(find.text('Bagikan Estimasi Nilai'), findsNothing);
+      expect(find.text('Simpan'), findsOneWidget);
+      expect(find.text('Bagikan Estimasi Nilai'), findsOneWidget);
     });
 
     testWidgets('10. KprResultPage has only "Hitung Ulang" button (no "Simpan Hasil Simulasi ke Riwayat")', (WidgetTester tester) async {
