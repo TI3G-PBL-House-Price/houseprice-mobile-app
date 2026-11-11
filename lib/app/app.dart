@@ -9,9 +9,8 @@ class App extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      title: 'House Price Prediction',
-      routerConfig: appRouter,
       debugShowCheckedModeBanner: false,
+      routerConfig: appRouter,
     );
   }
 }
