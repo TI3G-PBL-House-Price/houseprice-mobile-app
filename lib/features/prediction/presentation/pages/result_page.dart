@@ -9,6 +9,8 @@ import '../../../../core/session/auth_session.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../../../routes.dart';
 import '../../../history/presentation/widgets/history_bottom_sheet.dart';
+import '../../../kpr/business_logic/kpr_calculator.dart';
+import '../../../kpr/utils/currency_formatter.dart';
 import '../../data/prediction_result_data.dart';
 
 /// Layar Hasil Estimasi & Cek Kewajaran (FR-MOB-03 & FR-MOB-04).
@@ -26,6 +28,11 @@ class _ResultPageState extends State<ResultPage> {
 
   bool _saved = false;
 
+  // ── State Cek Kewajaran ───────────────────────────────────────────────────
+  final _penawaranCtrl = TextEditingController();
+  KewajaranResult? _kewajaranResult;
+  bool _isEvaluating = false;
+
   String _short(int v) =>
       'Rp ${(v / 1000000000).toStringAsFixed(2).replaceAll('.', ',')} M';
 
@@ -33,6 +40,43 @@ class _ResultPageState extends State<ResultPage> {
 
   String _perM2(int v) =>
       'Rp ${(v / 1000000).toStringAsFixed(1).replaceAll('.', ',')} Jt / m\u00B2';
+
+  @override
+  void dispose() {
+    _penawaranCtrl.dispose();
+    super.dispose();
+  }
+
+  void _evaluasiKewajaran() {
+    final rawText = _penawaranCtrl.text.replaceAll('.', '');
+    final penawaran = double.tryParse(rawText) ?? 0;
+    if (penawaran <= 0) {
+      ScaffoldMessenger.of(context)
+        ..removeCurrentSnackBar()
+        ..showSnackBar(const SnackBar(
+          content: Text('Masukkan harga penawaran yang valid'),
+          backgroundColor: AppColors.primaryNavy,
+          duration: Duration(seconds: 2),
+        ));
+      return;
+    }
+
+    setState(() => _isEvaluating = true);
+
+    final d = widget.data;
+    Future.delayed(const Duration(milliseconds: 400), () {
+      if (!mounted) return;
+      final result = KewajaranCalculator.evaluasi(
+        hargaPenawaran: penawaran,
+        estimasiMin: d.lowerBound.toDouble(),
+        estimasiMax: d.upperBound.toDouble(),
+      );
+      setState(() {
+        _kewajaranResult = result;
+        _isEvaluating = false;
+      });
+    });
+  }
 
   void _save() {
     if (_saved) return;
@@ -363,13 +407,15 @@ class _ResultPageState extends State<ResultPage> {
           ),
           const SizedBox(height: AppSizes.sm),
           Text(
-            'Masukkan harga penawaran penjual untuk evaluasi',
+            'Masukkan harga penawaran penjual untuk evaluasi kewajaran terhadap estimasi pasar ML.',
             style: AppTypography.bodySmall,
           ),
           const SizedBox(height: AppSizes.md),
           TextField(
+            controller: _penawaranCtrl,
             style: AppTypography.inputContent,
             keyboardType: TextInputType.number,
+            inputFormatters: [ThousandsSeparatorInputFormatter()],
             decoration: InputDecoration(
               hintText: 'Contoh: 2.500.000.000',
               prefixIcon: const Icon(Icons.payments_rounded, color: AppColors.textHint),
@@ -381,23 +427,166 @@ class _ResultPageState extends State<ResultPage> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              icon: const Icon(Icons.assessment_rounded, size: 18),
-              label: const Text('Evaluasi Kewajaran'),
-              onPressed: () {
-                // Evaluasi deviasi
-              },
+              icon: _isEvaluating
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: AppColors.white))
+                  : const Icon(Icons.assessment_rounded, size: 18),
+              label: Text(_isEvaluating ? 'Mengevaluasi...' : 'Evaluasi Kewajaran'),
+              onPressed: _isEvaluating ? null : _evaluasiKewajaran,
             ),
           ),
-          const SizedBox(height: AppSizes.md),
-          const Center(
-            child: StatusBadge(
-              type: StatusType.wajar,
-              label: 'Wajar / Sesuai Pasar (Deviasi 2%)',
-            ),
-          ),
+
+          // ── Hasil Evaluasi (muncul setelah tombol ditekan) ───────────────
+          if (_kewajaranResult != null) ...[
+            const SizedBox(height: AppSizes.base),
+            const Divider(),
+            const SizedBox(height: AppSizes.sm),
+            _buildKewajaranResult(_kewajaranResult!),
+          ],
         ],
       ),
     );
+  }
+
+  /// Widget hasil evaluasi kewajaran harga
+  Widget _buildKewajaranResult(KewajaranResult kr) {
+    final StatusType badgeType;
+    final Color statusColor;
+    final IconData statusIcon;
+
+    switch (kr.status) {
+      case StatusKewajaran.murah:
+        badgeType = StatusType.murah;
+        statusColor = AppColors.successGreen;
+        statusIcon = Icons.trending_down_rounded;
+      case StatusKewajaran.wajar:
+        badgeType = StatusType.wajar;
+        statusColor = AppColors.infoBlue;
+        statusIcon = Icons.check_circle_outline_rounded;
+      case StatusKewajaran.mahal:
+        badgeType = StatusType.mahal;
+        statusColor = AppColors.alertRed;
+        statusIcon = Icons.trending_up_rounded;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Status badge besar
+        Center(
+          child: Column(
+            children: [
+              Icon(statusIcon, color: statusColor, size: 40),
+              const SizedBox(height: AppSizes.sm),
+              StatusBadge(type: badgeType, label: kr.labelStatus),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSizes.base),
+
+        // Perbandingan harga
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _nilaiBox('Harga Penawaran',
+                CurrencyFormatter.formatCompact(kr.hargaPenawaran), statusColor),
+            Container(width: 1, height: 50, color: AppColors.inputSurface),
+            _nilaiBox('Estimasi Pasar',
+                CurrencyFormatter.formatCompact(kr.hargaEstimasi), AppColors.textSecondary),
+          ],
+        ),
+        const SizedBox(height: AppSizes.sm),
+
+        // Deviasi
+        Container(
+          padding: const EdgeInsets.all(AppSizes.md),
+          decoration: BoxDecoration(
+            color: statusColor.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+            border: Border.all(color: statusColor.withValues(alpha: 0.2)),
+          ),
+          child: Row(children: [
+            Icon(Icons.percent, color: statusColor, size: 20),
+            const SizedBox(width: AppSizes.sm),
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Deviasi Harga',
+                  style: AppTypography.captionSmall
+                      .copyWith(color: AppColors.textSecondary)),
+              Text(
+                '${kr.deviasi >= 0 ? '+' : ''}${kr.deviasi.toStringAsFixed(1)}% dari estimasi pasar',
+                style: AppTypography.caption
+                    .copyWith(fontWeight: FontWeight.bold, color: statusColor),
+              ),
+            ]),
+          ]),
+        ),
+        const SizedBox(height: AppSizes.sm),
+
+        // Saran
+        Container(
+          padding: const EdgeInsets.all(AppSizes.md),
+          decoration: BoxDecoration(
+            color: AppColors.inputSurface,
+            borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+          ),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Icon(Icons.lightbulb_outline, color: AppColors.textSecondary, size: 16),
+            const SizedBox(width: AppSizes.sm),
+            Expanded(
+              child: Text(kr.saran,
+                  style: AppTypography.captionSmall
+                      .copyWith(color: AppColors.textSecondary, height: 1.5)),
+            ),
+          ]),
+        ),
+        const SizedBox(height: AppSizes.sm),
+
+        // Rentang kewajaran
+        _batasRow('Batas Bawah (Murah)',
+            CurrencyFormatter.formatRupiah(kr.batasWajarBawah), AppColors.successGreen),
+        const SizedBox(height: 4),
+        _batasRow('Estimasi Nilai Tengah',
+            CurrencyFormatter.formatRupiah(kr.hargaEstimasi), AppColors.primaryBlue),
+        const SizedBox(height: 4),
+        _batasRow('Batas Atas (Mahal)',
+            CurrencyFormatter.formatRupiah(kr.batasWajarAtas), AppColors.alertRed),
+      ],
+    );
+  }
+
+  Widget _nilaiBox(String label, String value, Color color) {
+    return Column(children: [
+      Text(label,
+          style: AppTypography.captionSmall
+              .copyWith(color: AppColors.textSecondary),
+          textAlign: TextAlign.center),
+      const SizedBox(height: 4),
+      Text(value,
+          style: AppTypography.caption
+              .copyWith(fontWeight: FontWeight.bold, color: color),
+          textAlign: TextAlign.center),
+    ]);
+  }
+
+  Widget _batasRow(String label, String value, Color color) {
+    return Row(children: [
+      Container(
+          width: 4,
+          height: 20,
+          decoration: BoxDecoration(
+              color: color, borderRadius: BorderRadius.circular(2))),
+      const SizedBox(width: AppSizes.sm),
+      Expanded(
+          child: Text(label,
+              style: AppTypography.captionSmall
+                  .copyWith(color: AppColors.textSecondary))),
+      Text(value,
+          style: AppTypography.caption
+              .copyWith(fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+    ]);
   }
 
   /// Tombol aksi bawah: Hitung Ulang, Simpan, Bagikan
