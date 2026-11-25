@@ -1,6 +1,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 import '/../core/chart/price_chart.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -90,7 +91,6 @@ class HomeScreen extends StatelessWidget {
 
                 const SizedBox(height: 32),
 
-                
                 const Text(
                   'Apa yang bisa kami bantu?',
                   textAlign: TextAlign.center,
@@ -114,22 +114,28 @@ class HomeScreen extends StatelessWidget {
 
                 const SizedBox(height: 20),
 
-            
+                // ESTIMATION CARD
                 _buildFeatureCard(
                   icon: 'assets/icons/CalculatorIcon.svg',
                   title: 'Hitung estimasi biaya',
                   description:
                       'Prediksi harga pasar dengan akurasi data ML berdasarkan luas tanah, bangunan, dan lokasi di Jakarta.',
+                  onTap: () {
+                    context.go('/estimation');
+                  },
                 ),
 
                 const SizedBox(height: 16),
 
-            
+                // MORTGAGE CARD
                 _buildFeatureCard(
                   icon: 'assets/icons/BanknotesIcon.svg',
                   title: 'Kalkulator KPR',
                   description:
                       'Simulasi cicilan bulanan, bunga fixed & floating, serta pilihan tenor terbaik yang sesuai anggaran Anda.',
+                  onTap: () {
+                    context.go('/mortgage');
+                  },
                 ),
 
                 const SizedBox(height: 24),
@@ -146,58 +152,68 @@ class HomeScreen extends StatelessWidget {
     required String icon,
     required String title,
     required String description,
+    required VoidCallback onTap,
   }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
 
-      decoration: BoxDecoration(
-        color: Colors.white,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
 
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SvgPicture.asset(
-            icon,
-            width: 40,
-            height: 40,
-            colorFilter: const ColorFilter.mode(
-              Color(0xFF142B45),
-              BlendMode.srcIn,
-            ),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
 
-          const SizedBox(height: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SvgPicture.asset(
+                icon,
+                width: 40,
+                height: 40,
+                colorFilter: const ColorFilter.mode(
+                  Color(0xFF142B45),
+                  BlendMode.srcIn,
+                ),
+              ),
 
-          Text(
-            title,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-              color: Color(0xFF142B45),
-            ),
+              const SizedBox(height: 16),
+
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: Color(0xFF142B45),
+                ),
+              ),
+
+              const SizedBox(height: 6),
+
+              Text(
+                description,
+                textAlign: TextAlign.left,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF424D65),
+                ),
+              ),
+            ],
           ),
-
-          const SizedBox(height: 6),
-
-          Text(
-            description,
-            textAlign: TextAlign.left,
-            style: const TextStyle(
-              fontSize: 12,
-              color: Color(0xFF424D65),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
