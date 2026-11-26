@@ -24,6 +24,7 @@ class _LoginPageState extends State<LoginPage> {
 
   String? _emailError;
   String? _passwordError;
+  bool _isLoading = false;
 
   final RegExp _emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
 
@@ -61,38 +62,49 @@ class _LoginPageState extends State<LoginPage> {
     return emailErr == null && passwordErr == null;
   }
 
-  void _handleLogin() {
-    if (_validateForm()) {
-      final email = _emailController.text.trim();
-      final password = _passwordController.text;
+  Future<void> _handleLogin() async {
+    if (!_validateForm()) return;
 
-      final errorMsg = AuthSession.login(email, password);
-      if (errorMsg == null) {
-        ScaffoldMessenger.of(context).removeCurrentSnackBar();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Login berhasil! Selamat datang, ${AuthSession.currentUserName ?? email}.',
-            ),
-            backgroundColor: AppColors.successGreen,
-            duration: const Duration(seconds: 2),
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    setState(() => _isLoading = true);
+
+    String? errorMsg;
+    if (AuthSession.isTestMode) {
+      errorMsg = AuthSession.login(email, password);
+    } else {
+      errorMsg = await AuthSession.loginWithBackend(email, password);
+    }
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (errorMsg == null) {
+      ScaffoldMessenger.of(context).removeCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Login berhasil! Selamat datang, ${AuthSession.currentUserName ?? email}.',
           ),
-        );
-        if (Navigator.canPop(context)) {
-          Navigator.pop(context);
-        } else {
-          Navigator.pushReplacementNamed(context, AppRoutes.landing);
-        }
+          backgroundColor: AppColors.successGreen,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
       } else {
-        ScaffoldMessenger.of(context).removeCurrentSnackBar();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMsg),
-            backgroundColor: AppColors.alertRed,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        Navigator.pushReplacementNamed(context, AppRoutes.landing);
       }
+    } else {
+      ScaffoldMessenger.of(context).removeCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMsg),
+          backgroundColor: AppColors.alertRed,
+          duration: const Duration(seconds: 3),
+        ),
+      );
     }
   }
 
@@ -179,9 +191,9 @@ class _LoginPageState extends State<LoginPage> {
 
                       // Tombol Masuk CTA
                       GradientButton(
-                        text: 'Masuk ke Akun',
-                        icon: Icons.login_rounded,
-                        onPressed: _handleLogin,
+                        text: _isLoading ? 'Memverifikasi...' : 'Masuk ke Akun',
+                        icon: _isLoading ? null : Icons.login_rounded,
+                        onPressed: _isLoading ? null : () => _handleLogin(),
                       ),
                     ],
                   ),

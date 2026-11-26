@@ -8,25 +8,82 @@ import '../../../../core/session/auth_session.dart';
 import '../../../../routes.dart';
 import '../../../history/presentation/widgets/history_bottom_sheet.dart';
 
+import '../../data/market_service.dart';
+
 /// Layar Beranda Pasar Properti (FR-MOB-01).
 /// Menampilkan ringkasan rata-rata harga, tren per kota, dan filter statistik.
-/// Referensi: design-system.md § 5 – Tab 1 "Beranda"
-class HomePage extends StatelessWidget {
+/// Terintegrasi dengan endpoint /api/v1/market-statistics dari backend Flask.
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
-  // ── Mock Data ──────────────────────────────────────────────────────────────
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  // ── Mock & Fallback Data ───────────────────────────────────────────────────
   static final _currencyFormat = NumberFormat('#,###', 'id_ID');
 
-  static const _mockAvgPrice = 2850000000; // Rp 2,85 M
-  static const _mockAvgPricePerM2 = 18500000; // Rp 18,5 Jt / m²
+  int _avgPrice = 2850000000; // Rp 2,85 M
+  int _avgPricePerM2 = 18500000; // Rp 18,5 Jt / m²
 
-  static const List<Map<String, dynamic>> _mockCityStats = [
+  List<Map<String, dynamic>> _cityStats = const [
     {'city': 'Jakarta Selatan', 'avg': 3200000000, 'change': 5.2},
     {'city': 'Jakarta Barat', 'avg': 2100000000, 'change': 3.8},
     {'city': 'Jakarta Timur', 'avg': 1800000000, 'change': -1.5},
     {'city': 'Jakarta Utara', 'avg': 2500000000, 'change': 2.1},
     {'city': 'Jakarta Pusat', 'avg': 4100000000, 'change': 4.6},
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLiveStatistics();
+  }
+
+  Future<void> _loadLiveStatistics() async {
+    if (AuthSession.isTestMode) return;
+    try {
+      final records = await MarketService.fetchMarketStatistics();
+      if (!mounted || records.isEmpty) return;
+
+      // Filter data level kota (di mana district bernilai null atau kosong)
+      final cityLevelRecords = records.where((r) => r['district'] == null || r['district'] == '').toList();
+      if (cityLevelRecords.isNotEmpty) {
+        final List<Map<String, dynamic>> updated = [];
+        double totalSum = 0;
+        int count = 0;
+
+        for (final item in cityLevelRecords) {
+          final cityName = item['city']?.toString() ?? '';
+          final avg = (item['avg_price'] as num?)?.toInt() ?? 0;
+          if (cityName.isNotEmpty && avg > 0) {
+            totalSum += avg;
+            count++;
+            // Cari baseline persentase jika ada
+            final existing = _cityStats.firstWhere(
+              (c) => (c['city'] as String).toLowerCase() == cityName.toLowerCase(),
+              orElse: () => {'change': 2.5},
+            );
+            updated.add({
+              'city': cityName,
+              'avg': avg,
+              'change': existing['change'] ?? 2.0,
+            });
+          }
+        }
+
+        if (updated.isNotEmpty) {
+          setState(() {
+            _cityStats = updated;
+            if (count > 0) {
+              _avgPrice = (totalSum / count).round();
+            }
+          });
+        }
+      }
+    } catch (_) {}
+  }
 
   String _formatBillions(int value) {
     final billions = value / 1000000000;
@@ -140,7 +197,7 @@ class HomePage extends StatelessWidget {
             const SizedBox(height: AppSizes.lg),
 
             // ── Daftar Kota ───────────────────────────────────────────────
-            ..._mockCityStats.map(_buildCityTile),
+            ..._cityStats.map(_buildCityTile),
 
             const SizedBox(height: AppSizes.xxl),
           ],
@@ -190,7 +247,7 @@ class HomePage extends StatelessWidget {
           ),
           const SizedBox(height: AppSizes.xs),
           Text(
-            _formatBillions(_mockAvgPrice),
+            _formatBillions(_avgPrice),
             style: AppTypography.displayNominal.copyWith(
               color: AppColors.white,
             ),
@@ -213,7 +270,7 @@ class HomePage extends StatelessWidget {
                 Icon(Icons.straighten_rounded, size: 16, color: AppColors.white.withValues(alpha: 0.7)),
                 const SizedBox(width: AppSizes.xs),
                 Text(
-                  'Rp ${_currencyFormat.format(_mockAvgPricePerM2 ~/ 1000000)} Jt / m²',
+                  'Rp ${_currencyFormat.format(_avgPricePerM2 ~/ 1000000)} Jt / m²',
                   style: AppTypography.caption.copyWith(
                     color: AppColors.white,
                     fontWeight: FontWeight.w600,
@@ -229,7 +286,7 @@ class HomePage extends StatelessWidget {
 
   /// Diagram batang sederhana rata-rata harga per kota.
   Widget _buildBarChart() {
-    final maxVal = _mockCityStats
+    final maxVal = _cityStats
         .map((s) => s['avg'] as int)
         .reduce((a, b) => a > b ? a : b);
 
@@ -247,7 +304,7 @@ class HomePage extends StatelessWidget {
         ],
       ),
       child: Column(
-        children: _mockCityStats.map((stat) {
+        children: _cityStats.map((stat) {
           final fraction = (stat['avg'] as int) / maxVal;
           final cityName = (stat['city'] as String).replaceAll('Jakarta ', 'Jak. ');
           return Padding(
