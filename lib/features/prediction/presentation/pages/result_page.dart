@@ -263,6 +263,30 @@ class _ResultPageState extends State<ResultPage> {
                   '(${_full(d.lowerBound)} - ${_full(d.upperBound)})',
                   style: AppTypography.captionSmall,
                 ),
+                if (d.algorithm != null || d.modelVersion != null) ...[
+                  const SizedBox(height: AppSizes.sm),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: AppSizes.sm, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryBlue.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.memory_rounded, size: 14, color: AppColors.primaryBlue),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${d.algorithm ?? 'XGBoost'} (${d.modelVersion ?? 'v2.0.0'})${d.latencyMs != null ? ' • ${d.latencyMs}ms' : ''}',
+                          style: AppTypography.captionSmall.copyWith(
+                            color: AppColors.primaryBlue,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

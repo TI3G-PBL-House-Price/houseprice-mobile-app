@@ -28,6 +28,7 @@ class _RegisterPageState extends State<RegisterPage> {
   String? _emailError;
   String? _passwordError;
   String? _confirmPasswordError;
+  bool _isLoading = false;
 
   final RegExp _emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
 
@@ -92,24 +93,54 @@ class _RegisterPageState extends State<RegisterPage> {
         confirmPasswordErr == null;
   }
 
-  void _handleRegister() {
-    if (_validateForm()) {
-      final name = _nameController.text.trim();
-      final email = _emailController.text.trim();
-      final password = _passwordController.text;
+  Future<void> _handleRegister() async {
+    if (!_validateForm()) return;
 
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    final confirmPassword = _confirmPasswordController.text;
+
+    setState(() => _isLoading = true);
+
+    String? errorMsg;
+    if (AuthSession.isTestMode) {
       AuthSession.register(name: name, email: email, password: password);
+    } else {
+      errorMsg = await AuthSession.registerWithBackend(
+        name: name,
+        email: email,
+        password: password,
+        confirmPassword: confirmPassword,
+      );
+    }
 
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (errorMsg != null && !errorMsg.contains('(Akun disimpan')) {
       ScaffoldMessenger.of(context).removeCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Pendaftaran berhasil! Akun $email siap digunakan untuk login.'),
-          backgroundColor: AppColors.successGreen,
-          duration: const Duration(seconds: 2),
+          content: Text(errorMsg),
+          backgroundColor: AppColors.alertRed,
+          duration: const Duration(seconds: 3),
         ),
       );
-      Navigator.pushReplacementNamed(context, AppRoutes.login);
+      return;
     }
+
+    ScaffoldMessenger.of(context).removeCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          errorMsg ?? 'Pendaftaran berhasil! Akun $email siap digunakan untuk login.',
+        ),
+        backgroundColor: AppColors.successGreen,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+    Navigator.pushReplacementNamed(context, AppRoutes.login);
   }
 
   @override
@@ -227,9 +258,9 @@ class _RegisterPageState extends State<RegisterPage> {
 
                       // Tombol Daftar CTA
                       GradientButton(
-                        text: 'Daftar Akun Baru',
-                        icon: Icons.person_add_alt_1_rounded,
-                        onPressed: _handleRegister,
+                        text: _isLoading ? 'Mendaftarkan...' : 'Daftar Akun Baru',
+                        icon: _isLoading ? null : Icons.person_add_alt_1_rounded,
+                        onPressed: _isLoading ? null : () => _handleRegister(),
                       ),
                     ],
                   ),

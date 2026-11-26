@@ -10,13 +10,13 @@ class GradientButton extends StatelessWidget {
   const GradientButton({
     super.key,
     required this.text,
-    required this.onPressed,
+    this.onPressed,
     this.icon,
     this.isExpanded = true,
   });
 
   final String text;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final IconData? icon;
   final bool isExpanded;
 

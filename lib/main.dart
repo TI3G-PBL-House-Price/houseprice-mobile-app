@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
+import 'core/session/auth_session.dart';
 import 'core/theme/app_theme.dart';
 import 'routes.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('id_ID', null);
+  await AuthSession.init();
   runApp(const HousePriceApp());
 }
 
